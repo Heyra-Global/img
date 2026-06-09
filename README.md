@@ -2,8 +2,6 @@
 
 Semantic image search powered by [CLIP](https://openai.com/research/clip). Search your image library using natural language — type "sunset over water" and find matching images instantly.
 
-![img screenshot](https://github.com/Heyra-Global/img/raw/main/.github/screenshot.png)
-
 ## Features
 
 - **Semantic search** — find images by meaning, not filenames

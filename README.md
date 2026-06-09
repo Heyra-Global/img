@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">img</h1>
+  <h1 align="center">img™</h1>
   <p align="center">
     Semantic image search powered by CLIP.<br/>
     Type what you see — find what you mean.

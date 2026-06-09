@@ -59,6 +59,10 @@ img/
 │   ├── indexer.py        # CLIP model loading, ChromaDB operations
 │   ├── requirements.txt
 │   └── Dockerfile
+├── mcp-server/
+│   ├── server.py         # MCP server (same search, no HTTP needed)
+│   ├── requirements.txt
+│   └── README.md
 ├── frontend/
 │   ├── src/
 │   │   ├── app/          # Next.js App Router pages
@@ -106,6 +110,38 @@ Delete `backend/data/` and restart the backend. Demo images re-index automatical
 | `DATA_DIR` | `./data` | Backend |
 | `DEMO_IMAGES_DIR` | `./demo-images` | Backend |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Frontend |
+
+## MCP Server
+
+The `mcp-server/` directory contains a standalone MCP server that exposes the same search functionality to AI agents (Cursor, Claude Desktop, Claude Code) without needing the FastAPI backend.
+
+### Tools available via MCP
+
+| Tool | Purpose |
+|------|---------|
+| `search_images` | Semantic search by natural language query |
+| `get_random_images` | Random selection for browsing |
+| `copy_image_to` | Copy image to a destination folder (e.g. slides `media/`) |
+| `index_folder` | Index a new folder of images |
+| `get_stats` | Collection statistics |
+
+### Integration with slides (noskillish/slides)
+
+The MCP server is designed to compose with other tools. Example workflow:
+
+1. Agent calls `search_images("dramatic sunset")` → gets results with file paths
+2. Agent calls `copy_image_to(id, "./media/", "sunset.png")` → image copied to slides project
+3. Agent writes the HTML slide referencing `media/sunset.png`
+
+### Running the MCP server
+
+```bash
+cd mcp-server
+pip install -r requirements.txt
+python server.py  # runs via stdio
+```
+
+Or configure in your MCP client (see `mcp-server/README.md` for Cursor/Claude Desktop config).
 
 ## Testing Search Quality
 

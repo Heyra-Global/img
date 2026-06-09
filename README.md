@@ -125,6 +125,40 @@ NEXT_PUBLIC_API_URL=https://your-backend.example.com npm run build
 | `POST` | `/api/index` | Index a folder of images |
 | `GET` | `/api/stats` | Collection statistics |
 
+## MCP Server (AI Agent Integration)
+
+The included MCP server lets AI assistants (Cursor, Claude Desktop, Claude Code) search your images directly. No web UI needed — just natural language.
+
+### Setup
+
+```bash
+cd mcp-server
+pip install -r requirements.txt
+```
+
+Add to your Cursor MCP config (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "img": {
+      "command": "python",
+      "args": ["/path/to/img/mcp-server/server.py"]
+    }
+  }
+}
+```
+
+### What you can do
+
+- "Find me a green background image" → `search_images`
+- "Copy that to my slides media folder" → `copy_image_to`
+- "Index all photos in ~/Pictures" → `index_folder`
+
+Works great with [noskillish/slides](https://github.com/noskillish/slides) — the agent finds images, copies them to `media/`, and wires them into slide HTML automatically.
+
+See [`mcp-server/README.md`](mcp-server/README.md) for full configuration docs.
+
 ## Tech Stack
 
 | Layer | Technology |

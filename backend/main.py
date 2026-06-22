@@ -1,5 +1,6 @@
 import io
 import os
+import threading
 import time
 import zipfile
 from pathlib import Path
@@ -18,11 +19,27 @@ DATA_DIR = os.environ.get("DATA_DIR", "./data")
 
 indexer: Optional[ImageIndexer] = None
 
+WARMUP_QUERIES = [
+    "nature", "ocean", "city", "business", "people", "technology",
+    "abstract", "food", "travel", "green", "blue", "dark", "minimal",
+    "office", "building", "landscape", "portrait", "product", "art",
+    "background", "light", "colorful", "sky", "water", "person",
+]
+
+
+def _startup_tasks():
+    # Tag any images missing orientation, then pre-warm common search
+    # embeddings so the first real search for popular terms is instant.
+    indexer.backfill_orientation()
+    indexer.warm_queries(WARMUP_QUERIES)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global indexer
     indexer = ImageIndexer(persist_dir=DATA_DIR)
+    # Run on a background thread so startup isn't blocked by the warmup.
+    threading.Thread(target=_startup_tasks, daemon=True).start()
     yield
 
 
@@ -56,6 +73,9 @@ class SearchResult(BaseModel):
     image_url: str
     thumb_url: str
     score: float
+    orientation: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
 
 
 class SearchResponse(BaseModel):
@@ -97,13 +117,29 @@ def _thumb_url(image_id: str, filename: str) -> str:
     return f"/api/images/{image_id}"
 
 
+def _serialize(r: dict) -> dict:
+    return {
+        "id": r["id"],
+        "filename": r["filename"],
+        "path": r["path"],
+        "image_url": _image_url(r["id"], r["filename"]),
+        "thumb_url": _thumb_url(r["id"], r["filename"]),
+        "orientation": r.get("orientation"),
+        "width": r.get("width"),
+        "height": r.get("height"),
+    }
+
+
 @app.get("/api/search", response_model=SearchResponse)
 async def search_images(
     q: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    orientation: Optional[str] = Query(
+        None, pattern="^(horizontal|vertical|square)$"
+    ),
 ):
-    results = indexer.search(q, n_results=limit + offset)
+    results = indexer.search(q, n_results=limit + offset, orientation=orientation)
 
     search_results = []
     for r in results[offset:]:
@@ -115,6 +151,9 @@ async def search_images(
                 image_url=_image_url(r["id"], r["filename"]),
                 thumb_url=_thumb_url(r["id"], r["filename"]),
                 score=r["score"],
+                orientation=r.get("orientation"),
+                width=r.get("width"),
+                height=r.get("height"),
             )
         )
 
@@ -125,20 +164,14 @@ async def search_images(
 async def recent_images(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    orientation: Optional[str] = Query(
+        None, pattern="^(horizontal|vertical|square)$"
+    ),
 ):
-    results = indexer.get_recent(limit + offset)
+    results = indexer.get_recent(limit + offset, orientation=orientation)
     paginated = results[offset:]
     return {
-        "results": [
-            {
-                "id": r["id"],
-                "filename": r["filename"],
-                "path": r["path"],
-                "image_url": _image_url(r["id"], r["filename"]),
-                "thumb_url": _thumb_url(r["id"], r["filename"]),
-            }
-            for r in paginated
-        ],
+        "results": [_serialize(r) for r in paginated],
         "total": len(paginated),
     }
 
@@ -146,19 +179,13 @@ async def recent_images(
 @app.get("/api/random")
 async def random_images(
     limit: int = Query(20, ge=1, le=100),
+    orientation: Optional[str] = Query(
+        None, pattern="^(horizontal|vertical|square)$"
+    ),
 ):
-    results = indexer.get_random(limit)
+    results = indexer.get_random(limit, orientation=orientation)
     return {
-        "results": [
-            {
-                "id": r["id"],
-                "filename": r["filename"],
-                "path": r["path"],
-                "image_url": _image_url(r["id"], r["filename"]),
-                "thumb_url": _thumb_url(r["id"], r["filename"]),
-            }
-            for r in results
-        ],
+        "results": [_serialize(r) for r in results],
         "total": len(results),
     }
 

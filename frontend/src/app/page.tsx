@@ -4,12 +4,27 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { SearchBar } from "@/components/search-bar";
 import { ImageGrid } from "@/components/image-grid";
 import { SelectionBar } from "@/components/selection-bar";
-import { ImageResult, searchImages, getRecentImages, getRandomImages, getStats } from "@/lib/api";
+import { OrientationFilter } from "@/components/orientation-filter";
+import {
+  ImageResult,
+  Orientation,
+  searchImages,
+  getRecentImages,
+  getRandomImages,
+  getStats,
+} from "@/lib/api";
 
 const PAGE_SIZE = 20;
 
+function scrollToTop() {
+  if (typeof window !== "undefined") {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
+}
+
 export default function Home() {
   const [query, setQuery] = useState("");
+  const [orientation, setOrientation] = useState<Orientation | null>(null);
   const [images, setImages] = useState<ImageResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,8 +45,9 @@ export default function Home() {
       setHasSearched(false);
       setIsLoading(true);
       setHasMore(true);
-      getRandomImages(PAGE_SIZE)
-        .catch(() => getRecentImages(PAGE_SIZE, 0))
+      scrollToTop();
+      getRandomImages(PAGE_SIZE, orientation ?? undefined)
+        .catch(() => getRecentImages(PAGE_SIZE, 0, orientation ?? undefined))
         .then((res) => {
           startTransition(() => {
             setImages(res.results);
@@ -41,29 +57,33 @@ export default function Home() {
         .catch(() => setImages([]))
         .finally(() => setIsLoading(false));
     }
-  }, [query]);
+  }, [query, orientation]);
 
-  const handleSearch = useCallback(async (q: string) => {
-    if (!q.trim()) return;
-    setIsSearching(true);
-    setHasSearched(true);
-    setHasMore(true);
-    try {
-      const res = await searchImages(q.trim(), PAGE_SIZE, 0);
-      startTransition(() => {
-        setImages(res.results);
-        setHasMore(res.results.length >= PAGE_SIZE);
-      });
-    } catch {
-      setImages([]);
-    } finally {
-      setIsSearching(false);
-    }
-  }, []);
+  const handleSearch = useCallback(
+    async (q: string) => {
+      if (!q.trim()) return;
+      setIsSearching(true);
+      setHasSearched(true);
+      setHasMore(true);
+      scrollToTop();
+      try {
+        const res = await searchImages(q.trim(), PAGE_SIZE, 0, orientation ?? undefined);
+        startTransition(() => {
+          setImages(res.results);
+          setHasMore(res.results.length >= PAGE_SIZE);
+        });
+      } catch {
+        setImages([]);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [orientation]
+  );
 
   useEffect(() => {
     if (!query.trim()) return;
-    const timer = setTimeout(() => handleSearch(query), 300);
+    const timer = setTimeout(() => handleSearch(query), 150);
     return () => clearTimeout(timer);
   }, [query, handleSearch]);
 
@@ -73,8 +93,8 @@ export default function Home() {
     try {
       const offset = images.length;
       const res = query.trim()
-        ? await searchImages(query.trim(), PAGE_SIZE, offset)
-        : await getRecentImages(PAGE_SIZE, offset);
+        ? await searchImages(query.trim(), PAGE_SIZE, offset, orientation ?? undefined)
+        : await getRecentImages(PAGE_SIZE, offset, orientation ?? undefined);
       const newImages = res.results;
       startTransition(() => {
         setImages((prev) => [...prev, ...newImages]);
@@ -85,7 +105,7 @@ export default function Home() {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [images.length, query, isLoadingMore, hasMore]);
+  }, [images.length, query, orientation, isLoadingMore, hasMore]);
 
   loadMoreRef.current = loadMore;
 
@@ -126,7 +146,7 @@ export default function Home() {
     <main className="flex-1 flex flex-col">
       {/* Floating header */}
       <header className="sticky top-0 z-50 w-full px-4 sm:px-6 lg:px-8 pt-4">
-        <div className="max-w-7xl mx-auto flex items-center gap-6 px-6 py-3 rounded-2xl bg-white/5 backdrop-blur-sm shadow-[0_2px_20px_rgba(0,0,0,0.3)]">
+        <div className="max-w-7xl mx-auto flex items-center gap-4 px-6 py-3 rounded-2xl bg-white/5 backdrop-blur-sm shadow-[0_2px_20px_rgba(0,0,0,0.3)]">
           <h1 className="text-sm font-medium text-foreground whitespace-nowrap">
             img
           </h1>
@@ -135,6 +155,7 @@ export default function Home() {
             onChange={setQuery}
             isSearching={isSearching}
           />
+          <OrientationFilter value={orientation} onChange={setOrientation} />
         </div>
       </header>
 

@@ -16,6 +16,7 @@ type ImageCardProps = {
   fullSrc: string;
   isSelected: boolean;
   onToggleSelect: () => void;
+  priority?: boolean;
 };
 
 function getTag(filename: string): string {
@@ -23,11 +24,22 @@ function getTag(filename: string): string {
   return name;
 }
 
-export function ImageCard({ image, src, fullSrc, isSelected, onToggleSelect }: ImageCardProps) {
+export function ImageCard({
+  image,
+  src,
+  fullSrc,
+  isSelected,
+  onToggleSelect,
+  priority = false,
+}: ImageCardProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [fullLoaded, setFullLoaded] = useState(false);
 
   const tag = getTag(image.filename);
+  // Reserve exact space before the image loads to prevent grid reflow/jank.
+  const aspectRatio =
+    image.width && image.height ? `${image.width} / ${image.height}` : undefined;
 
   function handleDownload(e: React.MouseEvent) {
     e.stopPropagation();
@@ -47,18 +59,22 @@ export function ImageCard({ image, src, fullSrc, isSelected, onToggleSelect }: I
         }`}
         onClick={() => setIsOpen(true)}
       >
-        {/* Image */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src}
-          alt={image.filename}
-          className={`w-full h-auto object-contain transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
-          onLoad={() => setLoaded(true)}
-          loading="lazy"
-        />
-        {!loaded && (
-          <div className="absolute inset-0 bg-muted animate-pulse aspect-[4/3]" />
-        )}
+        {/* Image (space reserved via aspect-ratio to avoid layout shift) */}
+        <div className="relative w-full" style={{ aspectRatio }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src}
+            alt={image.filename}
+            className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+            onLoad={() => setLoaded(true)}
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
+            decoding="async"
+          />
+          {!loaded && (
+            <div className="absolute inset-0 bg-muted animate-pulse" />
+          )}
+        </div>
 
 
         {/* Hover overlay */}
@@ -102,12 +118,28 @@ export function ImageCard({ image, src, fullSrc, isSelected, onToggleSelect }: I
           <DialogDescription className="sr-only">
             Full-size preview of {image.filename}
           </DialogDescription>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={fullSrc}
-            alt={image.filename}
-            className="w-full h-auto max-h-[85vh] object-contain"
-          />
+          {/* Progressive preview: show the cached thumbnail immediately, then
+              fade in the full-resolution image once it has loaded. */}
+          <div
+            className="relative w-full max-h-[85vh] mx-auto"
+            style={{ aspectRatio }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={src}
+              alt=""
+              aria-hidden
+              className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ${fullLoaded ? "opacity-0" : "opacity-100"}`}
+            />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={fullSrc}
+              alt={image.filename}
+              onLoad={() => setFullLoaded(true)}
+              decoding="async"
+              className={`relative w-full h-full object-contain transition-opacity duration-300 ${fullLoaded ? "opacity-100" : "opacity-0"}`}
+            />
+          </div>
           <div className="flex items-center justify-between px-2 py-1">
             <p className="text-sm font-mono text-muted-foreground">#{tag}</p>
             <button

@@ -1,5 +1,7 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+export type Orientation = "horizontal" | "vertical";
+
 export type ImageResult = {
   id: string;
   filename: string;
@@ -7,6 +9,9 @@ export type ImageResult = {
   image_url: string;
   thumb_url?: string;
   score?: number;
+  orientation?: string;
+  width?: number;
+  height?: number;
 };
 
 type SearchResponse = {
@@ -37,13 +42,18 @@ export function getImageUrl(imageUrl: string): string {
   return `${API_BASE}${imageUrl}`;
 }
 
+function orientationParam(orientation?: Orientation): string {
+  return orientation ? `&orientation=${orientation}` : "";
+}
+
 export async function searchImages(
   query: string,
   limit = 20,
-  offset = 0
+  offset = 0,
+  orientation?: Orientation
 ): Promise<SearchResponse> {
   const res = await fetch(
-    `${API_BASE}/api/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`
+    `${API_BASE}/api/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}${orientationParam(orientation)}`
   );
   if (!res.ok) throw new Error("Search failed");
   return res.json();
@@ -51,17 +61,23 @@ export async function searchImages(
 
 export async function getRecentImages(
   limit = 20,
-  offset = 0
+  offset = 0,
+  orientation?: Orientation
 ): Promise<RecentResponse> {
-  const res = await fetch(`${API_BASE}/api/recent?limit=${limit}&offset=${offset}`);
+  const res = await fetch(
+    `${API_BASE}/api/recent?limit=${limit}&offset=${offset}${orientationParam(orientation)}`
+  );
   if (!res.ok) throw new Error("Failed to fetch recent images");
   return res.json();
 }
 
 export async function getRandomImages(
-  limit = 20
+  limit = 20,
+  orientation?: Orientation
 ): Promise<RecentResponse> {
-  const res = await fetch(`${API_BASE}/api/random?limit=${limit}`);
+  const res = await fetch(
+    `${API_BASE}/api/random?limit=${limit}${orientationParam(orientation)}`
+  );
   if (!res.ok) throw new Error("Failed to fetch random images");
   return res.json();
 }
